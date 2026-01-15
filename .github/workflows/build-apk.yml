@@ -21,14 +21,13 @@ jobs:
         sudo apt update
         sudo apt install -y \
         git zip unzip openjdk-17-jdk \
-        python3-pip \
         libffi-dev libssl-dev \
         build-essential
 
-    - name: Install Buildozer
+    - name: Install Buildozer & Cython
       run: |
-        pip install --user buildozer
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        pip install --upgrade pip setuptools wheel
+        pip install cython buildozer
 
     - name: Build APK
       run: |
