@@ -13,20 +13,16 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    - name: Set up Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
-
-    # 🔴 Install Cython as SYSTEM COMMAND
-    - name: Install system dependencies
+    # ✅ Use system Python, not setup-python
+    - name: Install system dependencies (CRITICAL)
       run: |
         sudo apt update
         sudo apt install -y \
+          python3 \
           python3-pip \
-          python3-dev \
           python3-setuptools \
-          cython3 \
+          python3-wheel \
+          python3-cython \
           build-essential \
           git zip unzip \
           openjdk-17-jdk \
@@ -35,21 +31,19 @@ jobs:
           zlib1g-dev \
           libncurses5
 
-    # 🔴 Create cython command explicitly
-    - name: Ensure cython command exists
+    # ✅ Verify cython exists (this MUST pass)
+    - name: Verify Cython
       run: |
-        which cython || true
-        which cython3
-        sudo ln -sf /usr/bin/cython3 /usr/bin/cython
+        which cython
         cython --version
 
-    # 🔴 Install buildozer AFTER cython exists
+    # ✅ Install buildozer using system python
     - name: Install Buildozer
       run: |
-        python -m pip install --upgrade pip
-        python -m pip install buildozer
+        python3 -m pip install --upgrade pip
+        python3 -m pip install buildozer==1.5.0
 
-    # 🔴 Build APK
+    # ✅ Build APK
     - name: Build APK
       run: |
         buildozer android debug
