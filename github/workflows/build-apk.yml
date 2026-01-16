@@ -24,10 +24,11 @@ jobs:
         libffi-dev libssl-dev \
         build-essential
 
-    - name: Install Buildozer & Cython
+    - name: Install Buildozer and Cython
       run: |
-        pip install --upgrade pip setuptools wheel
-        pip install cython buildozer
+        python -m pip install --upgrade pip
+        pip install cython==0.29.36 buildozer
+
 
     - name: Build APK
       run: |
