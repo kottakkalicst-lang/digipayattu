@@ -1,50 +1,33 @@
-name: Build Android APK
+name: Build Digipayattu APK
 
 on:
   push:
     branches: [ "main" ]
-  workflow_dispatch:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-    - name: Install system dependencies
+    - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y \
-          python3 \
-          python3-pip \
-          build-essential \
-          git zip unzip \
-          openjdk-17-jdk \
-          libffi-dev \
-          libssl-dev \
-          zlib1g-dev \
-          libncurses5 \
-          cython3
+        sudo apt install -y python3-pip git zip unzip openjdk-17-jdk
+        pip install --upgrade pip
+        pip install buildozer cython
 
-    # 🔥 THIS IS THE KEY STEP (READ CAREFULLY)
-    - name: Force-create cython command
-      run: |
-        sudo ln -sf /usr/bin/cython3 /usr/local/bin/cython
-        ls -l /usr/local/bin/cython
-        cython --version
+    - name: Accept licenses
+      run: yes | sdkmanager --licenses || true
 
-    - name: Install Buildozer
-      run: |
-        python3 -m pip install --upgrade pip
-        python3 -m pip install buildozer
-
-    - name: Build APK
+    - name: Build with Buildozer
       run: |
         buildozer android debug
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
       with:
-        name: DigiPayattu-APK
+        name: digipayattu-apk
         path: bin/*.apk
