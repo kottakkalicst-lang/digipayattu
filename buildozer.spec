@@ -9,7 +9,7 @@ source.include_exts = py,kv,png,jpg,ttf
 
 version = 1.0
 
-requirements = python3,kivy,sqlite3
+requirements = python3,kivy
 
 orientation = portrait
 
@@ -23,4 +23,5 @@ android.minapi = 21
 [buildozer]
 
 log_level = 2
+
 
