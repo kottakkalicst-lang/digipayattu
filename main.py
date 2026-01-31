@@ -1,252 +1,195 @@
-import sqlite3
 from kivy.app import App
 from kivy.uix.boxlayout import BoxLayout
-from kivy.uix.scrollview import ScrollView
+from kivy.uix.gridlayout import GridLayout
+from kivy.uix.label import Label
 from kivy.uix.textinput import TextInput
 from kivy.uix.button import Button
-from kivy.uix.label import Label
+from kivy.uix.scrollview import ScrollView
+from kivy.uix.popup import Popup
 from kivy.core.window import Window
-from kivy.utils import get_color_from_hex
-from kivy.graphics import Color, RoundedRectangle
+from datetime import datetime
+import sqlite3
 
-# ---------------- WINDOW ----------------
-Window.clearcolor = get_color_from_hex("#0E0F1A")
-Window.softinput_mode = "resize"
-
-# ---------------- COLORS ----------------
-BG_MAIN = "#0E0F1A"
-CARD_BG = "#181A33"
-TEXT_MAIN = "#F9FAFB"
-TEXT_SUB = "#B5B8D1"
-ACCENT = "#6366F1"
-SUCCESS = "#22C55E"
-WARNING = "#F97316"
-INPUT_BG = "#0B0D1C"
+Window.size = (400, 700)
 
 DB_NAME = "digipayattu.db"
 
 
-# ---------------- DATABASE ----------------
+# ---------- DATABASE ----------
 def init_db():
     conn = sqlite3.connect(DB_NAME)
-    cur = conn.cursor()
-    cur.execute("""
-        CREATE TABLE IF NOT EXISTS records (
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS accounts(
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT,
             address TEXT,
-            phone TEXT UNIQUE,
-            received TEXT,
-            returned TEXT,
-            return_date TEXT
+            phone TEXT,
+            amount REAL,
+            giveback REAL,
+            date TEXT
         )
     """)
     conn.commit()
     conn.close()
 
 
-# ---------------- CARD ----------------
-class Card(BoxLayout):
-    def __init__(self, bg_color, radius=28, **kwargs):
-        super().__init__(**kwargs)
-        with self.canvas.before:
-            Color(*get_color_from_hex(bg_color))
-            self.rect = RoundedRectangle(pos=self.pos, size=self.size, radius=[radius])
-        self.bind(pos=self.update_rect, size=self.update_rect)
-
-    def update_rect(self, *args):
-        self.rect.pos = self.pos
-        self.rect.size = self.size
-
-
-# ---------------- MAIN UI ----------------
+# ---------- MAIN LAYOUT ----------
 class MainLayout(BoxLayout):
     def __init__(self, **kwargs):
-        super().__init__(orientation="vertical", size_hint=(1, 1), **kwargs)
+        super().__init__(orientation='vertical', padding=10, spacing=10, **kwargs)
 
-        # -------- HEADER --------
-        header = BoxLayout(
-            orientation="vertical",
-            padding=(24, 36),
-            size_hint_y=None,
-            height=170
-        )
-
-        header.add_widget(Label(
-            text="DIGIPAYATTU",
-            font_size=40,
+        title = Label(
+            text="Digipayattu",
+            font_size=26,
             bold=True,
-            color=get_color_from_hex(TEXT_MAIN),
             size_hint_y=None,
-            height=70
-        ))
-
-        header.add_widget(Label(
-            text="Developer • JITHESH KOTTAKKAL",
-            font_size=18,
-            color=get_color_from_hex(TEXT_SUB),
-            size_hint_y=None,
-            height=35
-        ))
-
-        self.add_widget(header)
-
-        # -------- SCROLL --------
-        scroll = ScrollView(size_hint=(1, 1))
-        content = BoxLayout(
-            orientation="vertical",
-            padding=24,
-            spacing=26,
-            size_hint_y=None
+            height=50
         )
-        content.bind(minimum_height=content.setter("height"))
+        self.add_widget(title)
 
-        # -------- CARD --------
-        card = Card(
-            CARD_BG,
-            orientation="vertical",
-            padding=26,
-            spacing=18,
-            size_hint_y=None
-        )
-        card.bind(minimum_height=card.setter("height"))
+        # -------- Add Account Section --------
+        self.name_input = TextInput(hint_text="Name", multiline=False)
+        self.address_input = TextInput(hint_text="Address", multiline=False)
+        self.phone_input = TextInput(hint_text="Phone", multiline=False)
+        self.amount_input = TextInput(hint_text="Amount", multiline=False, input_filter='float')
 
-        self.name = self.input_field("Name")
-        self.address = self.input_field("Address")
-        self.phone = self.input_field("Phone Number")
-        self.received = self.input_field("Received Item")
-        self.returned = self.input_field("Return Status")
-        self.return_date = self.input_field("Return Date (YYYY-MM-DD)")
+        self.add_widget(self.name_input)
+        self.add_widget(self.address_input)
+        self.add_widget(self.phone_input)
+        self.add_widget(self.amount_input)
 
-        for f in [
-            self.name, self.address, self.phone,
-            self.received, self.returned, self.return_date
-        ]:
-            card.add_widget(f)
+        add_btn = Button(text="My Account (Save)", size_hint_y=None, height=50)
+        add_btn.bind(on_press=self.save_account)
+        self.add_widget(add_btn)
 
-        card.add_widget(self.button("ADD RECORD", ACCENT, self.add_data))
-        card.add_widget(self.button("SEARCH RECORD", SUCCESS, self.search_data))
-        card.add_widget(self.button("UPDATE RETURN", WARNING, self.update_return))
+        # -------- Search Section --------
+        self.search_input = TextInput(hint_text="Enter Name to Search", multiline=False)
+        self.add_widget(self.search_input)
 
-        self.status = Label(
-            text="",
-            font_size=18,
-            color=get_color_from_hex(TEXT_SUB),
-            size_hint_y=None,
-            height=44
-        )
+        search_btn = Button(text="Search Account", size_hint_y=None, height=50)
+        search_btn.bind(on_press=self.search_account)
+        self.add_widget(search_btn)
 
-        card.add_widget(self.status)
+        # -------- Result Area --------
+        self.result_area = GridLayout(cols=1, size_hint_y=None, spacing=10)
+        self.result_area.bind(minimum_height=self.result_area.setter('height'))
 
-        content.add_widget(card)
-        scroll.add_widget(content)
+        scroll = ScrollView()
+        scroll.add_widget(self.result_area)
         self.add_widget(scroll)
 
-    # ---------------- UI ELEMENTS ----------------
-    def input_field(self, hint):
-        return TextInput(
-            hint_text=hint,
-            font_size=22,
+        # -------- Footer --------
+        footer = Label(
+            text="App: Digipayattu\nDeveloped By Jithesh Kottakkal",
+            font_size=12,
             size_hint_y=None,
-            height=68,
-            multiline=False,
-            padding=(18, 20),
-            background_color=get_color_from_hex(INPUT_BG),
-            foreground_color=get_color_from_hex(TEXT_MAIN),
-            hint_text_color=(0.6, 0.6, 0.6, 1),
-            cursor_color=(1, 1, 1, 1)
+            height=50
         )
+        self.add_widget(footer)
 
-    def button(self, text, color, action):
-        btn = Button(
-            text=text,
-            font_size=20,
-            size_hint_y=None,
-            height=66,
-            background_normal="",
-            background_color=get_color_from_hex(color),
-            color=(1, 1, 1, 1)
-        )
-        btn.bind(on_press=action)
-        return btn
+    # ---------- Save Account ----------
+    def save_account(self, instance):
+        name = self.name_input.text
+        address = self.address_input.text
+        phone = self.phone_input.text
+        amount = self.amount_input.text
 
-    # ---------------- LOGIC ----------------
-    def add_data(self, instance):
-        try:
-            conn = sqlite3.connect(DB_NAME)
-            cur = conn.cursor()
-            cur.execute("""
-                INSERT INTO records
-                (name, address, phone, received, returned, return_date)
-                VALUES (?, ?, ?, ?, ?, ?)
-            """, (
-                self.name.text,
-                self.address.text,
-                self.phone.text,
-                self.received.text,
-                self.returned.text,
-                self.return_date.text
-            ))
-            conn.commit()
-            conn.close()
-            self.status.text = "Record added successfully"
-            self.clear()
-        except sqlite3.IntegrityError:
-            self.status.text = "Phone number already exists"
-
-    def search_data(self, instance):
-        if not self.name.text and not self.phone.text:
-            self.status.text = "Enter Name or Phone to search"
+        if not name or not amount:
+            self.popup("Error", "Name and Amount required")
             return
 
         conn = sqlite3.connect(DB_NAME)
-        cur = conn.cursor()
-
-        if self.phone.text:
-            cur.execute("SELECT * FROM records WHERE phone = ?", (self.phone.text,))
-        else:
-            cur.execute("SELECT * FROM records WHERE name LIKE ?", (self.name.text + "%",))
-
-        row = cur.fetchone()
-        conn.close()
-
-        if row:
-            self.name.text = row[1]
-            self.address.text = row[2]
-            self.phone.text = row[3]
-            self.received.text = row[4]
-            self.returned.text = row[5]
-            self.return_date.text = row[6]
-            self.status.text = "Record loaded"
-        else:
-            self.status.text = "No record found"
-
-    def update_return(self, instance):
-        if not self.phone.text:
-            self.status.text = "Search record first"
-            return
-
-        conn = sqlite3.connect(DB_NAME)
-        cur = conn.cursor()
-        cur.execute("""
-            UPDATE records
-            SET returned = ?, return_date = ?
-            WHERE phone = ?
-        """, (self.returned.text, self.return_date.text, self.phone.text))
+        c = conn.cursor()
+        c.execute("""
+            INSERT INTO accounts (name, address, phone, amount, giveback, date)
+            VALUES (?, ?, ?, ?, ?, ?)
+        """, (name, address, phone, float(amount), 0, ""))
         conn.commit()
         conn.close()
 
-        self.status.text = "Return details updated"
+        self.popup("Success", "Account Saved")
+        self.clear_inputs()
 
-    def clear(self):
-        for f in [
-            self.name, self.address, self.phone,
-            self.received, self.returned, self.return_date
-        ]:
-            f.text = ""
+    # ---------- Search Account ----------
+    def search_account(self, instance):
+        self.result_area.clear_widgets()
+        name = self.search_input.text
+
+        conn = sqlite3.connect(DB_NAME)
+        c = conn.cursor()
+        c.execute("SELECT * FROM accounts WHERE name LIKE ?", ('%' + name + '%',))
+        rows = c.fetchall()
+        conn.close()
+
+        if not rows:
+            self.result_area.add_widget(Label(text="No Records Found", size_hint_y=None, height=40))
+            return
+
+        for row in rows:
+            self.result_area.add_widget(self.create_result_card(row))
+
+    # ---------- Result Card ----------
+    def create_result_card(self, row):
+        box = BoxLayout(orientation='vertical', padding=10, size_hint_y=None, height=220)
+
+        info = f"""
+Name: {row[1]}
+Address: {row[2]}
+Phone: {row[3]}
+Amount: ₹{row[4]}
+GiveBack: ₹{row[5]}
+Date: {row[6]}
+"""
+        box.add_widget(Label(text=info))
+
+        giveback_input = TextInput(hint_text="Enter Give Back Amount", multiline=False, input_filter='float')
+        box.add_widget(giveback_input)
+
+        btn = Button(text="Give Back", size_hint_y=None, height=40)
+        btn.bind(on_press=lambda x: self.update_giveback(row[0], giveback_input.text))
+        box.add_widget(btn)
+
+        return box
+
+    # ---------- Update Give Back ----------
+    def update_giveback(self, record_id, value):
+        if not value:
+            self.popup("Error", "Enter amount")
+            return
+
+        conn = sqlite3.connect(DB_NAME)
+        c = conn.cursor()
+        c.execute("SELECT giveback FROM accounts WHERE id=?", (record_id,))
+        old = c.fetchone()[0]
+
+        new_total = old + float(value)
+        date_now = datetime.now().strftime("%d-%m-%Y %H:%M")
+
+        c.execute("""
+            UPDATE accounts
+            SET giveback=?, date=?
+            WHERE id=?
+        """, (new_total, date_now, record_id))
+
+        conn.commit()
+        conn.close()
+
+        self.popup("Success", "Give Back Updated")
+
+    # ---------- Helpers ----------
+    def popup(self, title, msg):
+        Popup(title=title, content=Label(text=msg),
+              size_hint=(None, None), size=(300, 200)).open()
+
+    def clear_inputs(self):
+        self.name_input.text = ""
+        self.address_input.text = ""
+        self.phone_input.text = ""
+        self.amount_input.text = ""
 
 
-# ---------------- APP ----------------
+# ---------- APP ----------
 class DigiPayattuApp(App):
     def build(self):
         init_db()
