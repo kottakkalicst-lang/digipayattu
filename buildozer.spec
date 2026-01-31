@@ -1,20 +1,25 @@
 [app]
-title = DigiPayattu
+
+title = Digipayattu
 package.name = digipayattu
 package.domain = org.jithesh
 
 source.dir = .
-source.include_exts = py
+source.include_exts = py,kv,png,jpg,ttf
 
-version = 0.1
+version = 1.0
 
 requirements = python3,kivy,sqlite3
 
 orientation = portrait
-fullscreen = 1
 
-android.permissions = INTERNET,READ_EXTERNAL_STORAGE,WRITE_EXTERNAL_STORAGE
+fullscreen = 0
+
+android.permissions = INTERNET
+
+android.api = 33
+android.minapi = 21
 
 [buildozer]
+
 log_level = 2
-warn_on_root = 1
